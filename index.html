@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Dashboard — Expenses & HC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f4ff;
+    --text2: #8896b3;
+    --text3: #4a5878;
+    --accent: #3b82f6;
+    --accent2: #10b981;
+    --accent3: #f59e0b;
+    --accent4: #ef4444;
+    --accent5: #8b5cf6;
+    --accent6: #ec4899;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ── Upload screen ── */
+  #upload-screen {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2rem; padding: 2rem;
+  }
+  .upload-logo { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text2); text-transform: uppercase; }
+  .upload-logo span { color: var(--accent); }
+  .upload-title { font-size: 2.2rem; font-weight: 300; text-align: center; line-height: 1.3; }
+  .upload-title strong { font-weight: 600; color: var(--accent); }
+  .upload-drop {
+    width: 100%; max-width: 520px; border: 1.5px dashed var(--border2);
+    border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    background: var(--bg2);
+  }
+  .upload-drop:hover, .upload-drop.drag { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+  .upload-drop svg { width: 40px; height: 40px; stroke: var(--text2); margin-bottom: 1rem; }
+  .upload-drop p { color: var(--text2); line-height: 1.6; }
+  .upload-drop strong { color: var(--text); font-weight: 500; }
+  .upload-btn {
+    display: inline-block; margin-top: 1.25rem;
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.65rem 1.75rem; border-radius: 8px; font-family: var(--font);
+    font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: opacity 0.15s;
+  }
+  .upload-btn:hover { opacity: 0.85; }
+  #file-input { display: none; }
+  .upload-hint { font-size: 0.78rem; color: var(--text3); text-align: center; max-width: 420px; line-height: 1.6; }
+  .upload-hint a { color: var(--accent); text-decoration: none; }
+  .upload-sample {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.25rem; max-width: 520px; width: 100%;
+  }
+  .upload-sample h4 { font-size: 0.78rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.6rem; }
+  .col-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .col-pill { background: rgba(59,130,246,0.1); color: #93c5fd; font-size: 0.72rem; padding: 3px 9px; border-radius: 20px; font-family: var(--mono); }
+  .progress-bar { width: 100%; max-width: 520px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; display: none; }
+  .progress-fill { height: 100%; background: var(--accent); width: 0; transition: width 0.3s; border-radius: 2px; }
+  .loading-msg { color: var(--text2); font-size: 0.85rem; display: none; }
+
+  /* ── Main dashboard ── */
+  #dashboard { display: none; }
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(11,15,26,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 1rem; padding: 0 1.5rem; height: 52px;
+  }
+  .topbar-logo { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text2); text-transform: uppercase; white-space: nowrap; }
+  .topbar-logo span { color: var(--accent); }
+  .topbar-file { font-size: 0.78rem; color: var(--text3); font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-spacer { flex: 1; }
+  .topbar-reload { background: transparent; border: 1px solid var(--border2); color: var(--text2); border-radius: 6px; padding: 5px 12px; font-family: var(--font); font-size: 0.78rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+  .topbar-reload:hover { border-color: var(--accent); color: var(--accent); }
+
+  .main { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+
+  /* KPI row */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .kpi-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .kpi-label { font-size: 0.72rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+  .kpi-value { font-size: 1.7rem; font-weight: 300; color: var(--text); line-height: 1; }
+  .kpi-delta { font-size: 0.75rem; margin-top: 0.35rem; font-family: var(--mono); }
+  .delta-up { color: #f87171; }
+  .delta-dn { color: #34d399; }
+  .delta-flat { color: var(--text3); }
+
+  /* Tabs */
+  .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .tab-btn { background: none; border: none; color: var(--text2); font-family: var(--font); font-size: 0.85rem; font-weight: 500; padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; border-radius: 0; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Charts grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
+  .chart-card.full { grid-column: 1 / -1; }
+  .card-title { font-size: 0.8rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem; }
+  .legend-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: var(--text2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); }
+  .filter-label { font-size: 0.75rem; color: var(--text2); font-weight: 500; white-space: nowrap; }
+  select { background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-radius: 6px; padding: 5px 10px; font-family: var(--font); font-size: 0.78rem; cursor: pointer; outline: none; }
+  select:focus { border-color: var(--accent); }
+
+  /* Pivot table */
+  .pivot-wrap { overflow-x: auto; }
+  .pivot-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .pivot-table th { padding: 8px 12px; font-weight: 500; color: var(--text2); background: var(--bg3); border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .pivot-table th:first-child { text-align: left; }
+  .pivot-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: right; color: var(--text); }
+  .pivot-table td:first-child { text-align: left; font-weight: 500; }
+  .pivot-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .pivot-table tr.total-row td { background: var(--bg3); font-weight: 600; color: var(--accent); }
+  .yoy-pos { color: #f87171; font-family: var(--mono); font-size: 0.72rem; }
+  .yoy-neg { color: #34d399; font-family: var(--mono); font-size: 0.72rem; }
+
+  /* Heatmap */
+  .heat-table { width: 100%; border-collapse: separate; border-spacing: 3px; font-size: 0.75rem; }
+  .heat-table th { padding: 6px 8px; color: var(--text2); font-size: 0.7rem; font-weight: 500; text-align: center; text-transform: uppercase; letter-spacing: 0.04em; }
+  .heat-table th:first-child { text-align: left; }
+  .heat-table td { padding: 8px 10px; text-align: center; border-radius: 6px; font-family: var(--mono); font-size: 0.73rem; }
+  .heat-table td:first-child { text-align: left; font-family: var(--font); font-weight: 500; background: none !important; color: var(--text); }
+
+  /* Scenario badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 500; font-family: var(--mono); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #93c5fd; }
+  .badge-green { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+  .badge-amber { background: rgba(245,158,11,0.15); color: #fcd34d; }
+
+  /* Error */
+  .error-msg { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; border-radius: var(--radius); padding: 1rem 1.25rem; font-size: 0.85rem; margin: 1rem 0; }
+
+  @media (max-width: 768px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .topbar-file { display: none; }
+  }
+  @media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── UPLOAD SCREEN ── -->
+<div id="upload-screen">
+  <div class="upload-logo">Finance<span>Dash</span></div>
+  <h1 class="upload-title">Drop your <strong>Excel file</strong><br>to load the dashboard</h1>
+
+  <div class="upload-drop" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12v8M8 16l4-4 4 4M20 8a4 4 0 00-4-4H8a4 4 0 00-4 4v1h16V8z"/>
+    </svg>
+    <p><strong>Click to browse</strong> or drag &amp; drop your Excel file here</p>
+    <button class="upload-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">Choose file</button>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(event)">
+  </div>
+
+  <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <p class="loading-msg" id="loading-msg">Parsing data…</p>
+
+  <div class="upload-sample">
+    <h4>Expected columns in your sheet</h4>
+    <div class="col-list" id="col-list">
+      <span class="col-pill">Scenario</span><span class="col-pill">Fiscal_Year</span>
+      <span class="col-pill">Business_Unit</span><span class="col-pill">Region</span>
+      <span class="col-pill">Expense_Category</span><span class="col-pill">Amount_USD</span>
+      <span class="col-pill">Month</span><span class="col-pill">Gen_2</span>
+      <span class="col-pill">Employee_Type</span>
+    </div>
+  </div>
+  <p class="upload-hint">
+    Works with any .xlsx file containing the columns above. Extra columns are ignored.<br>
+    <a href="https://github.com/YOUR_USERNAME/finance-dashboard" target="_blank">View source on GitHub ↗</a>
+  </p>
+  <div id="upload-error"></div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-logo">Finance<span>Dash</span></div>
+    <div class="topbar-file" id="topbar-filename"></div>
+    <div class="topbar-spacer"></div>
+    <button class="topbar-reload" onclick="resetDashboard()">↩ Load new file</button>
+  </div>
+
+  <div class="main">
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('trend',this)">Trend analysis</button>
+      <button class="tab-btn" onclick="switchTab('yoy',this)">Y-O-Y comparison</button>
+      <button class="tab-btn" onclick="switchTab('pivot',this)">BU pivot</button>
+      <button class="tab-btn" onclick="switchTab('breakdown',this)">Breakdown</button>
+    </div>
+
+    <!-- TREND -->
+    <div class="tab-panel active" id="tab-trend">
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="card-title">Total expenses — multi-year trend</div>
+          <div class="legend-row" id="leg-exp-trend"></div>
+          <div style="position:relative;height:230px"><canvas id="c-exp-trend" role="img" aria-label="Expense trend 2023-2026"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Headcount by business unit</div>
+          <div class="legend-row" id="leg-hc-trend"></div>
+          <div style="position:relative;height:230px"><canvas id="c-hc-trend" role="img" aria-label="Headcount trend by BU"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="card-title">Expenses by region</div>
+          <div class="legend-row" id="leg-region"></div>
+          <div style="position:relative;height:220px"><canvas id="c-region" role="img" aria-label="Expenses by region"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Comp vs non-comp split</div>
+          <div class="legend-row" id="leg-comp"></div>
+          <div style="position:relative;height:220px"><canvas id="c-comp" role="img" aria-label="Comp vs non-comp"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-bottom:14px">
+        <div class="card-title">Monthly expense profile — most recent full-year actual <span id="monthly-yr-label" class="badge badge-blue"></span></div>
+        <div style="position:relative;height:200px"><canvas id="c-monthly" role="img" aria-label="Monthly expenses"></canvas></div>
+      </div>
+    </div>
+
+    <!-- YOY -->
+    <div class="tab-panel" id="tab-yoy">
+      <div class="filter-bar">
+        <span class="filter-label">Business unit:</span>
+        <select id="yoy-bu" onchange="renderYOY()"><option value="all">All</option></select>
+        <span class="filter-label">Metric:</span>
+        <select id="yoy-metric" onchange="renderYOY()">
+          <option value="exp">Expenses</option>
+          <option value="hc">Headcount</option>
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="card-title" id="yoy-bar-title">Expenses by year</div>
+          <div class="legend-row" id="leg-yoy-bar"></div>
+          <div id="yoy-bar-wrap" style="position:relative;height:320px"><canvas id="c-yoy-bar" role="img" aria-label="YOY bar chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Y-O-Y % change</div>
+          <div id="yoy-delta-wrap" style="position:relative;height:320px"><canvas id="c-yoy-delta" role="img" aria-label="YOY delta chart"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-bottom:14px">
+        <div class="card-title">Year-over-year summary table</div>
+        <div class="pivot-wrap" id="yoy-table"></div>
+      </div>
+    </div>
+
+    <!-- PIVOT -->
+    <div class="tab-panel" id="tab-pivot">
+      <div class="filter-bar">
+        <span class="filter-label">Metric:</span>
+        <select id="piv-metric" onchange="renderPivot()">
+          <option value="exp">Expenses ($M)</option>
+          <option value="hc">Headcount</option>
+          <option value="cph">Cost per head ($K)</option>
+        </select>
+        <span class="filter-label">Dimension:</span>
+        <select id="piv-dim" onchange="renderPivot()">
+          <option value="bu">By business unit</option>
+          <option value="region">By region</option>
+          <option value="comp">By comp/non-comp</option>
+        </select>
+        <span class="filter-label">Scenario:</span>
+        <select id="piv-scenario" onchange="renderPivot()"></select>
+      </div>
+      <div class="chart-card" style="margin-bottom:14px">
+        <div class="card-title">Pivot table</div>
+        <div class="pivot-wrap" id="pivot-table-wrap"></div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Expense intensity heatmap ($M per BU)</div>
+        <div class="pivot-wrap" id="heat-wrap"></div>
+      </div>
+    </div>
+
+    <!-- BREAKDOWN -->
+    <div class="tab-panel" id="tab-breakdown">
+      <div class="filter-bar">
+        <span class="filter-label">Business unit:</span>
+        <select id="bd-bu" onchange="renderBreakdown()"><option value="all">All</option></select>
+        <span class="filter-label">Year:</span>
+        <select id="bd-yr" onchange="renderBreakdown()"></select>
+        <span class="filter-label">Scenario:</span>
+        <select id="bd-sc" onchange="renderBreakdown()"></select>
+      </div>
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="card-title" id="bd-pie-title">Expense share by BU</div>
+          <div class="legend-row" id="leg-bd-exp"></div>
+          <div style="position:relative;height:280px"><canvas id="c-bd-exp" role="img" aria-label="Expense pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Headcount distribution</div>
+          <div class="legend-row" id="leg-bd-hc"></div>
+          <div style="position:relative;height:280px"><canvas id="c-bd-hc" role="img" aria-label="HC pie"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title" id="bd-scatter-title">Cost per head — expenses vs HC</div>
+        <div style="position:relative;height:280px"><canvas id="c-bd-scatter" role="img" aria-label="Cost per head scatter"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Palette ──
+const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa'];
+const MONTHS_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const chartMap = {};
+
+// ── Global data store ──
+let G = { rows:[], years:[], bus:[], regions:[], scenarios:[], expScenarios:{} };
+
+// ── Upload handling ──
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); loadFile(e.dataTransfer.files[0]); });
+
+function handleFile(e){ if(e.target.files[0]) loadFile(e.target.files[0]); }
+
+function loadFile(file){
+  if(!file) return;
+  const pb = document.getElementById('progress-bar');
+  const pf = document.getElementById('progress-fill');
+  const lm = document.getElementById('loading-msg');
+  pb.style.display='block'; lm.style.display='block'; pf.style.width='20%';
+  document.getElementById('upload-error').innerHTML='';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      pf.style.width='50%';
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const sheetName = wb.SheetNames.find(n=>/input|data|dummy/i.test(n)) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      pf.style.width='75%';
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      parseData(rows, file.name);
+      pf.style.width='100%';
+      setTimeout(()=>{ pb.style.display='none'; lm.style.display='none'; }, 400);
+    } catch(err){
+      pb.style.display='none'; lm.style.display='none';
+      document.getElementById('upload-error').innerHTML=`<div class="error-msg">Error reading file: ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseData(rows, filename){
+  // Normalise column names
+  const norm = r => {
+    const out={};
+    for(const k in r){ out[k.trim().replace(/\s+/g,'_')]=r[k]; }
+    return out;
+  };
+  G.rows = rows.map(norm).filter(r=>r.Amount_USD!==''&&r.Amount_USD!==undefined);
+
+  // Parse Amount_USD as float
+  G.rows.forEach(r=>{ r.Amount_USD = parseFloat(r.Amount_USD)||0; r.Fiscal_Year=+r.Fiscal_Year; });
+
+  G.years = [...new Set(G.rows.map(r=>r.Fiscal_Year))].filter(Boolean).sort();
+  G.bus = [...new Set(G.rows.map(r=>r.Business_Unit))].filter(Boolean).sort();
+  G.regions = [...new Set(G.rows.map(r=>r.Region))].filter(Boolean).sort();
+  G.scenarios = [...new Set(G.rows.map(r=>r.Scenario))].filter(Boolean).sort();
+
+  // Auto-detect "best" scenario per year (prefer actual: A, then P, then FY)
+  G.expScenarios = {};
+  G.years.forEach(y=>{
+    const scs = G.scenarios.filter(s=>s.includes(String(y)));
+    const a = scs.find(s=>/A$/.test(s)) || scs.find(s=>/P$/.test(s)) || scs.find(s=>/FY$/.test(s)) || scs[0];
+    if(a) G.expScenarios[y]=a;
+  });
+
+  document.getElementById('topbar-filename').textContent = filename;
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+
+  populateSelects();
+  buildAllCharts();
+}
+
+function populateSelects(){
+  // YOY BU
+  const yoyBu = document.getElementById('yoy-bu');
+  G.bus.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; yoyBu.appendChild(o); });
+
+  // Pivot scenario
+  const pivSc = document.getElementById('piv-scenario');
+  G.scenarios.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; pivSc.appendChild(o); });
+
+  // Breakdown BU
+  const bdBu = document.getElementById('bd-bu');
+  G.bus.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; bdBu.appendChild(o); });
+
+  // Breakdown year
+  const bdYr = document.getElementById('bd-yr');
+  G.years.slice().reverse().forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; bdYr.appendChild(o); });
+
+  // Breakdown scenario
+  const bdSc = document.getElementById('bd-sc');
+  G.scenarios.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; bdSc.appendChild(o); });
+}
+
+// ── Aggregation helpers ──
+function agg(filterFn, groupFn){
+  const map={};
+  G.rows.forEach(r=>{
+    if(!filterFn(r)) return;
+    const k=groupFn(r);
+    map[k]=(map[k]||0)+r.Amount_USD;
+  });
+  return map;
+}
+
+function getExpPerBUYear(sc=null){
+  // Returns {bu: {year: amount}}
+  const res={};
+  G.bus.forEach(b=>{ res[b]={}; G.years.forEach(y=>{ res[b][y]=0; }); });
+  G.rows.forEach(r=>{
+    if(r.Expense_Category==='HC') return;
+    const useSc = sc || G.expScenarios[r.Fiscal_Year];
+    if(sc && r.Scenario!==sc) return;
+    if(!sc && r.Scenario!==G.expScenarios[r.Fiscal_Year]) return;
+    if(!res[r.Business_Unit]) res[r.Business_Unit]={};
+    res[r.Business_Unit][r.Fiscal_Year]=(res[r.Business_Unit][r.Fiscal_Year]||0)+r.Amount_USD;
+  });
+  return res;
+}
+
+function getHCPerBUYear(sc=null){
+  const res={};
+  G.bus.forEach(b=>{ res[b]={}; G.years.forEach(y=>{ res[b][y]=0; }); });
+  G.rows.forEach(r=>{
+    if(r.Expense_Category!=='HC') return;
+    if(sc && r.Scenario!==sc) return;
+    if(!sc && r.Scenario!==G.expScenarios[r.Fiscal_Year]) return;
+    if(!res[r.Business_Unit]) res[r.Business_Unit]={};
+    res[r.Business_Unit][r.Fiscal_Year]=(res[r.Business_Unit][r.Fiscal_Year]||0)+r.Amount_USD;
+  });
+  return res;
+}
+
+// ── Chart helpers ──
+function dc(id){ if(chartMap[id]){ chartMap[id].destroy(); delete chartMap[id]; } }
+function mkLegend(id, labels, colors){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.innerHTML=labels.map((l,i)=>`<div class="legend-item"><span class="legend-dot" style="background:${colors[i%PALETTE.length]}"></span>${l}</div>`).join('');
+}
+function pct(a,b){ return b?((a-b)/b*100).toFixed(1):null; }
+function fmtM(v){ return '$'+(v/1e6).toFixed(1)+'M'; }
+function fmtMM(v){ return '$'+Math.round(v/1e6)+'M'; }
+function fmtK(v){ return (v/1000).toFixed(1)+'K'; }
+function fmtPct(v){ return v===null?'—':(v>0?'+':'')+v+'%'; }
+
+const darkGrid = 'rgba(255,255,255,0.06)';
+const baseOpts = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'rgba(17,24,39,0.95)', titleColor:'#f0f4ff', bodyColor:'#8896b3', borderColor:'rgba(255,255,255,0.1)', borderWidth:1 }},
+  scales:{ x:{ grid:{color:darkGrid}, ticks:{color:'#8896b3',font:{size:11}} }, y:{ grid:{color:darkGrid}, ticks:{color:'#8896b3',font:{size:11}} } }
+};
+
+function buildAllCharts(){
+  renderKPI();
+  renderTrend();
+  renderYOY();
+  renderPivot();
+  renderBreakdown();
+}
+
+// ── KPI ──
+function renderKPI(){
+  const expBU = getExpPerBUYear();
+  const hcBU = getHCPerBUYear();
+  const years = G.years;
+  const totExp = yi => G.bus.reduce((s,b)=>s+(expBU[b]?.[years[yi]]||0),0);
+  const totHC = yi => G.bus.reduce((s,b)=>s+(hcBU[b]?.[years[yi]]||0),0);
+
+  const latestYi = years.length-1;
+  const prevYi = Math.max(0,latestYi-1);
+  const totExpLast = totExp(latestYi);
+  const totExpPrev = totExp(prevYi);
+  const totHCLast = totHC(latestYi);
+  const totHCPrev = totHC(prevYi);
+  const cph = totHCLast>0?(totExpLast/totHCLast/1000):0;
+  const cphPrev = totHCPrev>0?(totExpPrev/totHCPrev/1000):0;
+  const d1 = pct(totExpLast,totExpPrev);
+  const d2 = pct(totHCLast,totHCPrev);
+  const d3 = pct(cph,cphPrev);
+
+  const kpis=[
+    {label:`Total expenses ${years[latestYi]}`,val:fmtMM(totExpLast),delta:d1,suffix:`vs ${years[prevYi]}`},
+    {label:`Total expenses ${years[prevYi]}`,val:fmtMM(totExpPrev),delta:null,suffix:'prior year'},
+    {label:`Headcount ${years[latestYi]}`,val:fmtK(totHCLast),delta:d2,suffix:`vs ${years[prevYi]}`},
+    {label:`Cost per head ${years[latestYi]}`,val:'$'+cph.toFixed(1)+'K',delta:d3,suffix:`vs ${years[prevYi]}`}
+  ];
+  document.getElementById('kpi-row').innerHTML=kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.val}</div>
+      <div class="kpi-delta ${k.delta===null?'delta-flat':+k.delta>0?'delta-up':'delta-dn'}">
+        ${k.delta===null?k.suffix:fmtPct(+k.delta)+' '+k.suffix}
+      </div>
+    </div>`).join('');
+}
+
+// ── TREND ──
+function renderTrend(){
+  const expBU=getExpPerBUYear(); const hcBU=getHCPerBUYear();
+  const years=G.years;
+
+  // Total expense line
+  dc('c-exp-trend');
+  const totExp=years.map(y=>G.bus.reduce((s,b)=>s+(expBU[b]?.[y]||0),0)/1e6);
+  chartMap['c-exp-trend']=new Chart(document.getElementById('c-exp-trend'),{
+    type:'line',
+    data:{labels:years,datasets:[{label:'Total expenses',data:totExp.map(v=>+v.toFixed(1)),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.08)',fill:true,tension:0.35,pointRadius:5,borderWidth:2,pointBackgroundColor:'#3b82f6'}]},
+    options:{...baseOpts,plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>'$'+v+'M'}}}}
+  });
+
+  // HC lines per BU
+  mkLegend('leg-hc-trend',G.bus.slice(0,5),PALETTE);
+  dc('c-hc-trend');
+  chartMap['c-hc-trend']=new Chart(document.getElementById('c-hc-trend'),{
+    type:'line',
+    data:{labels:years,datasets:G.bus.map((b,i)=>({label:b,data:years.map(y=>+((hcBU[b]?.[y]||0)/1000).toFixed(1)),borderColor:PALETTE[i],backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:1.5,borderDash:i>=5?[4,3]:[]}) )},
+    options:{...baseOpts,plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+'K'}}}}
+  });
+
+  // Region stacked bar
+  mkLegend('leg-region',G.regions,PALETTE);
+  dc('c-region');
+  chartMap['c-region']=new Chart(document.getElementById('c-region'),{
+    type:'bar',
+    data:{labels:years,datasets:G.regions.map((r,i)=>{
+      const d=years.map(y=>{
+        const usedScs = Object.values(G.expScenarios);
+        const v=G.rows.filter(row=>row.Region===r&&row.Fiscal_Year===y&&row.Expense_Category!=='HC'&&usedScs.includes(row.Scenario)&&row.Scenario===G.expScenarios[y]).reduce((s,row)=>s+row.Amount_USD,0);
+        return +(v/1e6).toFixed(1);
+      });
+      return {label:r,data:d,backgroundColor:PALETTE[i],stack:'s'};
+    })},
+    options:{...baseOpts,plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x,stacked:true},y:{...baseOpts.scales.y,stacked:true,ticks:{...baseOpts.scales.y.ticks,callback:v=>'$'+v+'M'}}}}
+  });
+
+  // Comp/Non-comp
+  const COMP=['Compensation','Non-Compensation','Non-compensation'];
+  const compKey=g2=>COMP.slice(0,1).some(c=>g2===c)?'Compensation':'Non-Compensation';
+  mkLegend('leg-comp',['Compensation','Non-Compensation'],['#3b82f6','#f59e0b']);
+  dc('c-comp');
+  const compData=years.map(y=>{
+    const usedSc=G.expScenarios[y];
+    return G.rows.filter(r=>r.Fiscal_Year===y&&r.Scenario===usedSc&&r.Expense_Category!=='HC'&&/comp/i.test(r.Gen_2||'')&&!/non/i.test(r.Gen_2||'')).reduce((s,r)=>s+r.Amount_USD,0)/1e6;
+  });
+  const nonCompData=years.map(y=>{
+    const usedSc=G.expScenarios[y];
+    return G.rows.filter(r=>r.Fiscal_Year===y&&r.Scenario===usedSc&&r.Expense_Category!=='HC'&&/non.*comp/i.test(r.Gen_2||'')).reduce((s,r)=>s+r.Amount_USD,0)/1e6;
+  });
+  chartMap['c-comp']=new Chart(document.getElementById('c-comp'),{
+    type:'bar',
+    data:{labels:years,datasets:[
+      {label:'Compensation',data:compData.map(v=>+v.toFixed(1)),backgroundColor:'#3b82f6',stack:'s'},
+      {label:'Non-Compensation',data:nonCompData.map(v=>+v.toFixed(1)),backgroundColor:'#f59e0b',stack:'s'}
+    ]},
+    options:{...baseOpts,plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x,stacked:true},y:{...baseOpts.scales.y,stacked:true,ticks:{...baseOpts.scales.y.ticks,callback:v=>'$'+v+'M'}}}}
+  });
+
+  // Monthly for most recent actual year
+  const actualYears=G.years.filter(y=>{const sc=G.expScenarios[y];return sc&&/A$/.test(sc);});
+  const myrYear=actualYears.length?Math.max(...actualYears):G.years[G.years.length-1];
+  const myrSc=G.expScenarios[myrYear];
+  document.getElementById('monthly-yr-label').textContent=`${myrYear} — ${myrSc}`;
+  const monthlyDC=MONTHS_ORDER.map(m=>G.rows.filter(r=>r.Month===m&&r.Fiscal_Year===myrYear&&r.Scenario===myrSc&&r.Expense_Category==='Direct Cost').reduce((s,r)=>s+r.Amount_USD,0)/1e6);
+  const monthlyIC=MONTHS_ORDER.map(m=>G.rows.filter(r=>r.Month===m&&r.Fiscal_Year===myrYear&&r.Scenario===myrSc&&r.Expense_Category==='Indirect Cost').reduce((s,r)=>s+r.Amount_USD,0)/1e6);
+  dc('c-monthly');
+  chartMap['c-monthly']=new Chart(document.getElementById('c-monthly'),{
+    type:'bar',
+    data:{labels:MONTHS_ORDER,datasets:[
+      {label:'Direct cost',data:monthlyDC.map(v=>+v.toFixed(1)),backgroundColor:'#3b82f6',stack:'s'},
+      {label:'Indirect cost',data:monthlyIC.map(v=>+v.toFixed(1)),backgroundColor:'#10b981',stack:'s'}
+    ]},
+    options:{...baseOpts,plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x,stacked:true,ticks:{...baseOpts.scales.x.ticks,autoSkip:false}},y:{...baseOpts.scales.y,stacked:true,ticks:{...baseOpts.scales.y.ticks,callback:v=>'$'+v+'M'}}}}
+  });
+}
+
+// ── YOY ──
+function renderYOY(){
+  const bu=document.getElementById('yoy-bu').value;
+  const isHC=document.getElementById('yoy-metric').value==='hc';
+  const DATA=isHC?getHCPerBUYear():getExpPerBUYear();
+  const years=G.years;
+  const buList=bu==='all'?G.bus:[bu];
+  document.getElementById('yoy-bar-title').textContent=`${isHC?'Headcount':'Expenses'} by year${bu!=='all'?' — '+bu:''}`;
+
+  // Bar chart
+  const yr2col=['#3b82f6','#10b981','#f59e0b','#8b5cf6'];
+  mkLegend('leg-yoy-bar',years.map(String),yr2col);
+  dc('c-yoy-bar');
+  const barH=Math.max(buList.length*40+80,260);
+  document.getElementById('yoy-bar-wrap').style.height=barH+'px';
+  chartMap['c-yoy-bar']=new Chart(document.getElementById('c-yoy-bar'),{
+    type:'bar',
+    data:{labels:buList,datasets:years.map((y,i)=>({label:String(y),data:buList.map(b=>isHC?+((DATA[b]?.[y]||0)/1000).toFixed(1):+((DATA[b]?.[y]||0)/1e6).toFixed(1)),backgroundColor:yr2col[i%yr2col.length]}))},
+    options:{...baseOpts,indexAxis:'y',plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x,ticks:{...baseOpts.scales.x.ticks,callback:v=>isHC?v+'K':'$'+v+'M'}},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,font:{size:11}}}}}
+  });
+
+  // Delta chart
+  const deltaCols=['#10b981','#f59e0b','#ef4444'];
+  dc('c-yoy-delta');
+  const dH=Math.max(buList.length*50+80,260);
+  document.getElementById('yoy-delta-wrap').style.height=dH+'px';
+  const deltaSets=years.slice(1).map((y,i)=>({
+    label:`${y} vs ${years[i]}`,
+    data:buList.map(b=>{
+      const cur=DATA[b]?.[y]||0; const prev=DATA[b]?.[years[i]]||0;
+      return prev?+(((cur-prev)/prev)*100).toFixed(1):null;
+    }),
+    backgroundColor:deltaCols[i%deltaCols.length]
+  }));
+  chartMap['c-yoy-delta']=new Chart(document.getElementById('c-yoy-delta'),{
+    type:'bar',
+    data:{labels:buList,datasets:deltaSets},
+    options:{...baseOpts,indexAxis:'y',plugins:{...baseOpts.plugins},scales:{x:{...baseOpts.scales.x,ticks:{...baseOpts.scales.x.ticks,callback:v=>v+'%'}},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,font:{size:11}}}}}
+  });
+
+  // Table
+  let h=`<table class="pivot-table"><thead><tr><th>Business unit</th>${years.map(y=>`<th>${y}</th>`).join('')}${years.slice(1).map((y,i)=>`<th>${y} YoY</th>`).join('')}</tr></thead><tbody>`;
+  let tots=years.map(()=>0);
+  buList.forEach(b=>{
+    const row=years.map(y=>DATA[b]?.[y]||0);
+    row.forEach((v,i)=>tots[i]+=v);
+    const fmt=v=>isHC?fmtK(v):fmtM(v);
+    h+=`<tr><td>${b}</td>${row.map(v=>`<td>${fmt(v)}</td>`).join('')}`;
+    h+=years.slice(1).map((y,i)=>{const d=pct(row[i+1],row[i]);return `<td class="${d===null?'':(+d>0?'yoy-pos':'yoy-neg')}">${fmtPct(d)}</td>`;}).join('');
+    h+='</tr>';
+  });
+  if(bu==='all'){
+    const fmt=v=>isHC?fmtK(v):fmtM(v);
+    h+=`<tr class="total-row"><td>Total</td>${tots.map(v=>`<td>${fmt(v)}</td>`).join('')}`;
+    h+=tots.slice(1).map((v,i)=>{const d=pct(v,tots[i]);return `<td class="${d===null?'':(+d>0?'yoy-pos':'yoy-neg')}">${fmtPct(d)}</td>`;}).join('');
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  document.getElementById('yoy-table').innerHTML=h;
+}
+
+// ── PIVOT ──
+function renderPivot(){
+  const metric=document.getElementById('piv-metric').value;
+  const dim=document.getElementById('piv-dim').value;
+  const sc=document.getElementById('piv-scenario').value;
+  const years=G.years;
+  const fmt=v=>metric==='exp'?fmtM(v):metric==='hc'?fmtK(v):'$'+v.toFixed(1)+'K';
+
+  let rows=[];
+  if(dim==='bu'){
+    const expBU=getExpPerBUYear(sc);
+    const hcBU=getHCPerBUYear(sc);
+    rows=G.bus.map(b=>({
+      label:b,
+      vals:years.map(y=>{
+        if(metric==='exp') return expBU[b]?.[y]||0;
+        if(metric==='hc') return hcBU[b]?.[y]||0;
+        const e=expBU[b]?.[y]||0,h=hcBU[b]?.[y]||1;
+        return e/h/1000;
+      })
+    }));
+  } else if(dim==='region'){
+    rows=G.regions.map(r=>({
+      label:r,
+      vals:years.map(y=>{
+        return G.rows.filter(row=>row.Region===r&&row.Fiscal_Year===y&&row.Scenario===sc&&row.Expense_Category!=='HC').reduce((s,row)=>s+row.Amount_USD,0)/1e6;
+      })
+    }));
+  } else {
+    const cats=['Compensation','Non-Compensation','Non-compensation'];
+    rows=[
+      {label:'Compensation',vals:years.map(y=>G.rows.filter(r=>r.Fiscal_Year===y&&r.Scenario===sc&&r.Expense_Category!=='HC'&&/comp/i.test(r.Gen_2||'')&&!/non/i.test(r.Gen_2||'')).reduce((s,r)=>s+r.Amount_USD,0)/1e6)},
+      {label:'Non-Compensation',vals:years.map(y=>G.rows.filter(r=>r.Fiscal_Year===y&&r.Scenario===sc&&r.Expense_Category!=='HC'&&/non.*comp/i.test(r.Gen_2||'')).reduce((s,r)=>s+r.Amount_USD,0)/1e6)}
+    ];
+  }
+
+  let h=`<table class="pivot-table"><thead><tr><th>${dim==='bu'?'Business unit':dim==='region'?'Region':'Category'}</th>${years.map(y=>`<th>${y}</th>`).join('')}${years.slice(1).map((y,i)=>`<th>${y} YoY</th>`).join('')}</tr></thead><tbody>`;
+  let tots=years.map(()=>0);
+  rows.forEach(({label,vals})=>{
+    vals.forEach((v,i)=>tots[i]+=v);
+    h+=`<tr><td>${label}</td>${vals.map(v=>`<td>${fmt(v)}</td>`).join('')}`;
+    h+=vals.slice(1).map((v,i)=>{const d=pct(v,vals[i]);return `<td class="${d===null?'':(+d>0?'yoy-pos':'yoy-neg')}">${fmtPct(d)}</td>`;}).join('');
+    h+='</tr>';
+  });
+  h+=`<tr class="total-row"><td>Total</td>${tots.map(v=>`<td>${fmt(v)}</td>`).join('')}${tots.slice(1).map((v,i)=>{const d=pct(v,tots[i]);return `<td class="${d===null?'':(+d>0?'yoy-pos':'yoy-neg')}">${fmtPct(d)}</td>`;}).join('')}</tr>`;
+  h+='</tbody></table>';
+  document.getElementById('pivot-table-wrap').innerHTML=h;
+
+  // Heatmap
+  const expBU2=getExpPerBUYear(sc);
+  let allVals=[];
+  G.bus.forEach(b=>years.forEach(y=>allVals.push(expBU2[b]?.[y]||0)));
+  const maxV=Math.max(...allVals)||1;
+  let hm=`<table class="heat-table"><thead><tr><th>BU</th>${years.map(y=>`<th>${y}</th>`).join('')}</tr></thead><tbody>`;
+  G.bus.forEach(b=>{
+    hm+=`<tr><td>${b}</td>`;
+    years.forEach(y=>{
+      const v=expBU2[b]?.[y]||0;
+      const p=v/maxV;
+      const a=(0.12+p*0.7).toFixed(2);
+      hm+=`<td style="background:rgba(59,130,246,${a});color:rgba(240,244,255,${0.5+p*0.5})">${fmtM(v)}</td>`;
+    });
+    hm+='</tr>';
+  });
+  hm+='</tbody></table>';
+  document.getElementById('heat-wrap').innerHTML=hm;
+}
+
+// ── BREAKDOWN ──
+function renderBreakdown(){
+  const bu=document.getElementById('bd-bu').value;
+  const yr=+document.getElementById('bd-yr').value;
+  const sc=document.getElementById('bd-sc').value;
+  document.getElementById('bd-pie-title').textContent=`Expense share by BU — ${yr}`;
+  document.getElementById('bd-scatter-title').textContent=`Cost per head — ${yr} / ${sc}`;
+
+  const buList=bu==='all'?G.bus:[bu];
+  const expData=buList.map(b=>G.rows.filter(r=>r.Business_Unit===b&&r.Fiscal_Year===yr&&r.Scenario===sc&&r.Expense_Category!=='HC').reduce((s,r)=>s+r.Amount_USD,0)/1e6);
+  const hcData=buList.map(b=>G.rows.filter(r=>r.Business_Unit===b&&r.Fiscal_Year===yr&&r.Scenario===sc&&r.Expense_Category==='HC').reduce((s,r)=>s+r.Amount_USD,0)/1000);
+
+  mkLegend('leg-bd-exp',buList.slice(0,6),PALETTE);
+  dc('c-bd-exp');
+  chartMap['c-bd-exp']=new Chart(document.getElementById('c-bd-exp'),{
+    type:'doughnut',
+    data:{labels:buList,datasets:[{data:expData.map(v=>+v.toFixed(1)),backgroundColor:PALETTE,borderWidth:2,borderColor:'#111827'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': $'+c.parsed.toFixed(1)+'M'},backgroundColor:'rgba(17,24,39,0.95)',titleColor:'#f0f4ff',bodyColor:'#8896b3',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}}}
+  });
+
+  mkLegend('leg-bd-hc',buList.slice(0,6),PALETTE);
+  dc('c-bd-hc');
+  chartMap['c-bd-hc']=new Chart(document.getElementById('c-bd-hc'),{
+    type:'doughnut',
+    data:{labels:buList,datasets:[{data:hcData.map(v=>+v.toFixed(1)),backgroundColor:PALETTE,borderWidth:2,borderColor:'#111827'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.toFixed(1)+'K'},backgroundColor:'rgba(17,24,39,0.95)',titleColor:'#f0f4ff',bodyColor:'#8896b3',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}}}
+  });
+
+  dc('c-bd-scatter');
+  chartMap['c-bd-scatter']=new Chart(document.getElementById('c-bd-scatter'),{
+    type:'bubble',
+    data:{datasets:buList.map((b,i)=>{
+      const exp=expData[i]; const hc=hcData[i];
+      return {label:b,data:[{x:+hc.toFixed(1),y:+exp.toFixed(1),r:11}],backgroundColor:PALETTE[i]+'bb',borderColor:PALETTE[i]};
+    })},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: HC ${c.parsed.x}K | Exp $${c.parsed.y}M`},backgroundColor:'rgba(17,24,39,0.95)',titleColor:'#f0f4ff',bodyColor:'#8896b3',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}},scales:{x:{...baseOpts.scales.x,title:{display:true,text:'Headcount (K)',color:'#8896b3'},ticks:{...baseOpts.scales.x.ticks,callback:v=>v+'K'}},y:{...baseOpts.scales.y,title:{display:true,text:'Expenses ($M)',color:'#8896b3'},ticks:{...baseOpts.scales.y.ticks,callback:v=>'$'+v+'M'}}}}
+  });
+}
+
+// ── Tab switch ──
+function switchTab(id, btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  // Trigger resize so charts re-render correctly
+  setTimeout(()=>{ Object.values(chartMap).forEach(c=>c.resize()); },50);
+}
+
+function resetDashboard(){
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('file-input').value='';
+  Object.keys(chartMap).forEach(k=>{ chartMap[k].destroy(); delete chartMap[k]; });
+  G={rows:[],years:[],bus:[],regions:[],scenarios:[],expScenarios:{}};
+  ['yoy-bu','bd-bu','bd-yr','bd-sc','piv-scenario'].forEach(id=>{
+    const el=document.getElementById(id);
+    while(el.options.length>1) el.remove(1);
+    el.selectedIndex=0;
+  });
+}
+</script>
+</body>
+</html>
