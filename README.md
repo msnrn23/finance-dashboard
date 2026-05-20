@@ -10,7 +10,7 @@ A fully client-side finance dashboard that reads any `.xlsx` file and renders:
 
 git init && git add .  ------> **This is for add/delete any files from client directory to Git respositary **
 git commit -m "Finance dashboard"
-git branch -M main ------> **This is for main branch 
+git branch -M main ------> ****This is for code to push in main branch. Mandatory step for UAT and Prod Environment ** 
 git remote add origin https://github.com/YOUR_USERNAME/finance-dashboard.git
 git push -u origin main ------> **This is for add/delete any files from client directory to Git respositary **
 
