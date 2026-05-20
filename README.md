@@ -9,6 +9,8 @@ A fully client-side finance dashboard that reads any `.xlsx` file and renders:
 **No server required.** Everything runs in the browser. Host it anywhere static files are served — GitHub Pages, Netlify, Vercel, S3, etc.
 
 ---
+<img width="1203" height="713" alt="image" src="https://github.com/user-attachments/assets/b9a21e8a-32ce-4a61-9ccc-c7dd233093bb" />
+
 
 ## Quick start (GitHub Pages — recommended)
 
