@@ -8,6 +8,12 @@ A fully client-side finance dashboard that reads any `.xlsx` file and renders:
 
 **No server required.** Everything runs in the browser. Host it anywhere static files are served — GitHub Pages, Netlify, Vercel, S3, etc.
 
+git init && git add .  ------> **This is for add/delete any files from client directory to Git respositary **
+git commit -m "Finance dashboard"
+git branch -M main ------> **This is for main branch 
+git remote add origin https://github.com/YOUR_USERNAME/finance-dashboard.git
+git push -u origin main ------> **This is for add/delete any files from client directory to Git respositary **
+
 ---<img width="1224" height="746" alt="image" src="https://github.com/user-attachments/assets/9f43e4b2-68d5-4b55-80df-e08755573fb2" />
 
 
