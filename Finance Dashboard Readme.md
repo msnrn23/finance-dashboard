@@ -1,4 +1,4 @@
-# Finance Dashboard — Expenses & HC
+# Finance Dashboard — Expenses & HC Created for Testing
 
 A fully client-side finance dashboard that reads any `.xlsx` file and renders:
 - Multi-year expense & headcount trends
